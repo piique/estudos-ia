@@ -3,12 +3,9 @@
 import os
 from fpdf import FPDF
 from fpdf.enums import XPos
-
-# Importa 'find_dotenv' para localizar a raiz do projeto (onde o .env está)
 from dotenv import load_dotenv, find_dotenv
 
 # --- CARREGAR VARIÁVEIS DE AMBIENTE ---
-# Carrega as variáveis do arquivo .env (procurando para cima a partir do script)
 load_dotenv(find_dotenv())
 
 # --- CONFIGURAÇÕES ---
@@ -54,7 +51,7 @@ class PDF(FPDF):
 
     def body_text_from_file(self, text_file):
         """Lê e insere o conteúdo de um arquivo .txt"""
-        self.set_font("Courier", "", 8)  # Fonte em tamanho 8
+        self.set_font("Courier", "", 8)
         caminho_completo = os.path.join(RESULT_DIR, text_file)
 
         if os.path.exists(caminho_completo):
@@ -75,7 +72,8 @@ class PDF(FPDF):
         caminho_completo = os.path.join(RESULT_DIR, image_file)
         if os.path.exists(caminho_completo):
             x_pos = (self.w - width) / 2
-            self.image(caminho_completo, w=width, x=x_pos)
+            # Adiciona quebra de página automática se a imagem não couber
+            self.image(caminho_completo, w=width, x=x_pos, keep_aspect_ratio=True)
         else:
             self.set_font("Helvetica", "I", 10)
             self.multi_cell(0, 5, f"ERRO: Imagem '{image_file}' nao encontrada.")
@@ -85,30 +83,20 @@ class PDF(FPDF):
         """Adiciona a imagem estática E um link para o HTML interativo"""
         self.add_image(image_file, width)
         self.set_font("Helvetica", "U", 10)
-        self.set_text_color(0, 0, 255)
+        self.set_text_color(0, 0, 255)  # Define a cor azul para o link
 
         link_filename = os.path.basename(link_file)
 
         if GITHUB_PAGES_BASE_URL:
-            # --- INÍCIO DA LÓGICA DE PATH DINÂMICO ---
-
-            # 1. Encontra o .env (que define a raiz do repo)
             dotenv_path = find_dotenv()
-            # 2. Define a raiz do repositório como o diretório do .env
             repo_root = (
                 os.path.dirname(os.path.abspath(dotenv_path))
                 if dotenv_path
                 else os.getcwd()
             )
-
-            # 3. Path absoluto do diretório ONDE ESTE SCRIPT ESTÁ
             script_dir = os.path.abspath(os.path.dirname(__file__))
-
-            # 4. Path relativo do diretório do script em relação à raiz
-            #    Ex: 'agrupamento' ou 'trabalhos/agrupamento'
             relative_script_dir = os.path.relpath(script_dir, repo_root)
 
-            # 5. Constrói o caminho relativo para a pasta 'result'
             if relative_script_dir == ".":
                 relative_path_for_url = "result"
             else:
@@ -116,15 +104,11 @@ class PDF(FPDF):
                     relative_script_dir, "result"
                 ).replace(os.sep, "/")
 
-            # 6. Gera a URL pública e dinâmica
             link_url = (
                 f"{GITHUB_PAGES_BASE_URL}/{relative_path_for_url}/{link_filename}"
             )
 
-            # --- FIM DA LÓGICA ---
-
         else:
-            # Fallback: Gera um link de arquivo local
             link_path = os.path.join(RESULT_DIR, link_filename)
             link_url = f"file:///{os.path.abspath(link_path)}"
 
@@ -136,7 +120,7 @@ class PDF(FPDF):
             link=link_url,
             align="C",
         )
-        self.set_text_color(0, 0, 0)
+        self.set_text_color(0, 0, 0)  # Reseta a cor do texto para preto
         self.ln(10)
 
 
@@ -191,10 +175,21 @@ def gerar_pdf():
         ("f) Agglomerative Clustering", "p2_agglomerative", False),
     ]
 
-    for titulo, basename, tem_centros in algoritmos:
-        if pdf.get_y() > 170:
-            pdf.add_page()
+    MAX_PAGE_HEIGHT = 297 - 15
 
+    for titulo, basename, tem_centros in algoritmos:
+
+        # Estima a altura necessária para o próximo bloco
+        # Título(16) + Imagem(aprox 100) + Link(10) + Margem(10)
+        estimated_height = 136
+        if tem_centros and basename == "p2_kmeans":
+            estimated_height += 60  # Espaço extra para os centros do K-Means
+
+        # Verifica se o bloco cabe no espaço restante
+        if (pdf.get_y() + estimated_height) > MAX_PAGE_HEIGHT:
+            pdf.add_page()  # Pula a página ANTES de desenhar
+
+        # Agora desenha o bloco, sabendo que ele cabe
         pdf.section_title(titulo)
 
         if tem_centros:
@@ -232,7 +227,6 @@ def gerar_pdf():
 
 # --- EXECUÇÃO PRINCIPAL ---
 if __name__ == "__main__":
-    # Muda o diretório de trabalho para o diretório onde o script está
     script_parent_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_parent_dir)
 
