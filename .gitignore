@@ -1,0 +1,33 @@
+# Exclude typical build and environment folders
+bin/
+include/
+lib/
+lib64/
+share/
+lib64
+
+# Miniconda/Conda specific ignores
+*.conda
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env/
+.venv/
+__pycache__/
+conda-meta/
+envs/
+pkgs/
+*.log
+*.sqlite
+*.db
+
+# Miniconda installer files
+Miniconda3-*
+Miniconda2-*
+
+# Ignore virtual environment folders
+pyvenv.cfg
+
+# Ignore environment variable files
+.env
